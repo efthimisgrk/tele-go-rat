@@ -43,12 +43,12 @@ go build
 
 6. Start communicating with your bot via Telegram to execute commands and manage the remote system.
 
-##Usage
+## Usage
 - Send `/help` to get a list of available commands.
 - Have fun :)
 
-##License
+## License
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-##Disclaimer
+## Disclaimer
 **teleGoRAT** is intended for educational and research purposes only. The author is not responsible for any misuse or damage caused by this software.
