@@ -5,11 +5,12 @@ import (
 	"strings"
 )
 
-func ExtractData(inputText string) (string, error) {
+func ExtractArgument(inputText string) (string, error) {
+	
 	// Split the input text by spaces
 	parts := strings.Split(inputText, " ")
 
-	// Check if there are at least two parts ("/command" and the data)
+	// Check if there are at least two parts ("/command" and argument)
 	if len(parts) >= 2 {
 		// Join the remaining parts to get the desired data
 		return strings.Join(parts[1:], " "), nil
