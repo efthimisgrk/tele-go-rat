@@ -26,22 +26,24 @@ git clone https://github.com/efthimisgrk/teleGoRAT.git
 
 2. Create a Telegram bot and get your API token. You can follow the official Telegram documentation to create a bot: [Creating a new bot](https://core.telegram.org/bots#botfather).
 
-3. Add the API token to your environment variables with the name "BOT_TOKEN".
+3. Get your chatId by sending a message to yourself on the Telegram web application: `https://web.telegram.org/z/#<CHAT_ID>`
 
-4. Build the teleGoRAT binary:
+4. Add the API token and the chatId to your environment variables with the name "BOT_TOKEN" and "CHAT_ID" respectively.
+
+5. Build the teleGoRAT binary:
 
 ```shell
 cd teleGoRAT
 go build
 ```
 
-5. Run teleGoRAT:
+6. Run teleGoRAT:
 
 ```shell
 ./teleGoRAT
 ```
 
-6. Start communicating with your bot via Telegram to execute commands and manage the remote system.
+7. Start communicating with your bot via Telegram to execute commands and manage the remote system.
 
 ## Usage
 - Send `/help` to get a list of available commands.

