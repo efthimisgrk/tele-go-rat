@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/png"
 	"log"
+	"net/http"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -26,16 +27,11 @@ func main() {
 
 	token := os.Getenv("BOT_TOKEN")
 
-	//Get authorized controller's chatId
-	chatId, err := strconv.ParseInt(os.Getenv("CHAT_ID"), 10, 64)
-	if err != nil {
-		panic("Failed to convert chatId to int64: " + err.Error())
-	}
-
 	//Create new bot using the bot API token
 	b, err := gotgbot.NewBot(token, &gotgbot.BotOpts{
+		Client: http.Client{},
 		RequestOpts: &gotgbot.RequestOpts{
-			Timeout: gotgbot.DefaultTimeout * 3,
+			Timeout: 15,
 			APIURL:  gotgbot.DefaultAPIURL,
 		},
 	})
@@ -43,8 +39,14 @@ func main() {
 		panic("Failed to create new bot: " + err.Error())
 	}
 
+	//Get authorized controller's chatId
+	chatId, err = strconv.ParseInt(os.Getenv("CHAT_ID"), 10, 64)
+	if err != nil {
+		panic("Failed to convert chatId to int64: " + err.Error())
+	}
+
 	//Send message when initiating connection
-	_, err = b.SendMessage(chatId, "just connected", &gotgbot.SendMessageOpts{})
+	_, err = b.SendMessage(chatId, "hi", &gotgbot.SendMessageOpts{})
 	if err != nil {
 		panic("Failed to send initiate message: " + err.Error())
 	}
@@ -83,7 +85,7 @@ func main() {
 	//Start polling for updates
 	err = updater.StartPolling(b, &ext.PollingOpts{
 		DropPendingUpdates: true,
-		GetUpdatesOpts: &gotgbot.GetUpdatesOpts{
+		GetUpdatesOpts: gotgbot.GetUpdatesOpts{
 			Timeout: 9,
 			RequestOpts: &gotgbot.RequestOpts{
 				Timeout: time.Second * 10,
