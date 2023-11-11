@@ -37,10 +37,10 @@ cd tele-go-rat
 go build
 ```
 
-6. Run teleGoRAT:
+6. Run tele-go-rat:
 
 ```shell
-./teleGoRAT
+./tele-go-rat
 ```
 
 7. Start communicating with your bot via Telegram to execute commands and manage the remote system.
@@ -53,4 +53,4 @@ go build
 This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Disclaimer
-**teleGoRAT** is intended for educational and research purposes only. The author is not responsible for any misuse or damage caused by this software.
+**tele-go-rat** is intended for educational and research purposes only. The author is not responsible for any misuse or damage caused by this software.
